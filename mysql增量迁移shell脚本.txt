@@ -1,0 +1,61 @@
+# !/bin/bash  
+# Author    : 
+# create_ts : 2017年 01月 03日 星期二 14:48:14 CST
+# program   : Incremental transfer table records between MySQL servers
+# crontab   : 11/min
+#  
+#  
+# __init__  
+host_src=yourht_A    # source db server config list
+user_src=root
+pswd_src=123
+dbas_src=yourdb_A
+#
+host_tar=yourht_B    # target db server config list
+user_tar=root
+pswd_tar=456
+dbas_tar=yourdb_B
+#
+cach_dump=/    # cache directory config
+# 
+# 
+# define execute sql function
+function sqlrun_src(){
+mysql -h${host_src} -u${user_src} -p${pswd_src} <<EOF
+$1
+EOF
+}
+function sqlrun_tar(){
+mysql -h${host_tar} -u${user_tar} -p${pswd_tar} <<EOF
+$1
+EOF
+}
+#  
+#  
+# do synchronize
+tar_run="SELECT MAX(id) AS id FROM ${dbas_tar}.syn_tab;"
+if id_ori=$(sqlrun_tar "${tar_run}") && id=${id_ori#id}
+	then echo -e "\n\n …………Get Max id ${id}………… \n\n"
+else exit && echo -e "\n\n …………Get Max id Failed………… \n\n"
+fi
+# 
+src_run="SELECT * FROM ${dbas_src}.syn_tab WHERE id > ${id};"
+if sqlrun_src "${src_run}" > ${cach_dump}syn_tab.txt
+	then echo -e "\n\n …………Write syn_tab data OK………… \n\n"
+else exit && echo -e "\n\n …………Write syn_tab data Failed………… \n\n"
+fi
+# 
+if sed -i '1, $s/NULL/\\N/g' ${cach_dump}syn_tab.txt && /opt/mysql/bin/mysqlimport -h${host_tar} -u${user_tar} -p${pswd_tar} --ignore-lines=1 --local ${dbas_tar} ${cach_dump}syn_tab.txt
+		then echo -e "\n\n …………Import syn_tab data OK………… \n\n"
+else exit && echo -e "\n\n …………Write syn_tab data Failed………… \n\n"
+fi
+# 
+#   
+# clear cache  
+if
+	cd ${cach_dump} && rm -f syn_tab.txt
+		then echo -e "\n\n ……\(^o^)/ GangBaDei \(^o^)/…… \n\n"
+else exit && echo -e "\n\n ……o(>﹏<)o YaMieDie o(>﹏<)o…… \n\n"
+fi
+# 
+# 
